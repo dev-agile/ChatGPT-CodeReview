@@ -1,4 +1,5 @@
 import { OpenAI, AzureOpenAI } from 'openai';
+import log from 'loglevel';
 
 export class Chat {
   private openai: OpenAI | AzureOpenAI;
@@ -77,8 +78,10 @@ export class Chat {
     if (res.choices.length) {
       try {
         const json = JSON.parse(res.choices[0].message.content || "");
+        log.info(`ChatGPT response: lgtm=${json.lgtm}, comment_length=${json.review_comment?.length || 0}`);
         return json
       } catch (e) {
+        log.info(`Failed to parse ChatGPT JSON, using raw response`);
         return {
           lgtm: false,
           review_comment: res.choices[0].message.content || ""

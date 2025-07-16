@@ -164,11 +164,15 @@ export const robot = (app: Probot) => {
               body: res.review_comment,
               position: patch.split('\n').length - 1,
             })
+          } else {
+            log.info(`No comment for ${file.filename}: lgtm=${res.lgtm}, has_comment=${!!res.review_comment}`);
           }
         } catch (e) {
           log.info(`review ${file.filename} failed`, e);
         }
       }
+      
+      log.info(`Creating review with ${ress.length} comments`);
       try {
         await context.octokit.pulls.createReview({
           repo: repo.repo,
@@ -179,6 +183,7 @@ export const robot = (app: Probot) => {
           commit_id: commits[commits.length - 1].sha,
           comments: ress,
         });
+        log.info(`Review created successfully`);
       } catch (e) {
         log.info(`Failed to create review`, e);
       }
