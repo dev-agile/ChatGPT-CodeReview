@@ -10,9 +10,35 @@ const MAX_PATCH_COUNT = process.env.MAX_PATCH_LENGTH
   : Infinity;
 
 export const robot = (app: Probot) => {
+  // Function to load custom rules from repository
+  const loadCustomRules = async (context: Context): Promise<string | null> => {
+    const repo = context.repo();
+    
+    try {
+      const fileResponse = await context.octokit.repos.getContent({
+        owner: repo.owner,
+        repo: repo.repo,
+        path: '.github/code-review-rules.md',
+      });
+
+      if ('content' in fileResponse.data) {
+        const customRules = Buffer.from(fileResponse.data.content, 'base64').toString();
+        log.info('✅ Loaded custom review rules from .github/code-review-rules.md');
+        return customRules;
+      }
+    } catch (error) {
+      log.debug('No custom rules file found (.github/code-review-rules.md), using default rules');
+    }
+    
+    return null;
+  };
+
   const loadChat = async (context: Context) => {
+    // Load custom rules first
+    const customRules = await loadCustomRules(context);
+    
     if (process.env.OPENAI_API_KEY) {
-      return new Chat(process.env.OPENAI_API_KEY);
+      return new Chat(process.env.OPENAI_API_KEY, customRules);
     }
 
     const repo = context.repo();
@@ -31,7 +57,7 @@ export const robot = (app: Probot) => {
         return null;
       }
 
-      return new Chat(data.value);
+      return new Chat(data.value, customRules);
     } catch {
       await context.octokit.issues.createComment({
         repo: repo.repo,

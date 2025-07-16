@@ -4,11 +4,13 @@ import log from 'loglevel';
 export class Chat {
   private openai: OpenAI | AzureOpenAI;
   private isAzure: boolean;
+  private customRules: string | null;
 
-  constructor(apikey: string) {
+  constructor(apikey: string, customRules: string | null = null) {
     this.isAzure = Boolean(
         process.env.AZURE_API_VERSION && process.env.AZURE_DEPLOYMENT,
     );
+    this.customRules = customRules;
 
     if (this.isAzure) {
       // Azure OpenAI configuration
@@ -32,7 +34,17 @@ export class Chat {
         ? `Answer me in ${process.env.LANGUAGE},`
         : '';
 
-    const userPrompt = process.env.PROMPT || 'Please review the following code patch. Focus on potential bugs, risks, and improvement suggestions.';
+    let userPrompt = '';
+
+    // Use custom rules from repository if available
+    if (this.customRules) {
+      userPrompt = this.customRules;
+      log.info('🎯 Using custom review rules from .github/code-review-rules.md');
+    } else {
+      // Simple default if no custom rules
+      userPrompt = process.env.PROMPT || 'Review this code for critical issues: security vulnerabilities, bugs, performance problems, and code structure issues. Focus only on important problems that could break functionality.';
+      log.debug('Using default review prompt');
+    }
     
     const jsonFormatRequirement = '\nProvide your feedback in a strict JSON format with the following structure:\n' +
         '{\n' +
