@@ -10,6 +10,27 @@ const MAX_PATCH_COUNT = process.env.MAX_PATCH_LENGTH
   : Infinity;
 
 export const robot = (app: Probot) => {
+  // Allowed users/organizations
+  const ALLOWED_OWNERS = ['dev-agile', 'ToneMeUp'];
+
+  // Function to check if owner is authorized
+  const isAuthorizedOwner = (owner: string): boolean => {
+    const isAllowed = ALLOWED_OWNERS.includes(owner);
+    log.info(`Permission check for owner "${owner}": ${isAllowed ? 'ALLOWED' : 'BLOCKED'}`);
+    return isAllowed;
+  };
+
+  // Handle installation attempts - block unauthorized installations
+  app.on('installation.created', async (context: any) => {
+    const account = context.payload.installation.account;
+    
+    if (!isAuthorizedOwner(account.login)) {
+      log.warn(`🚫 Unauthorized installation attempt blocked: ${account.login}`);
+      return;
+    }
+    
+    log.info(`✅ Authorized installation: ${account.login}`);
+  });
   // Function to load custom rules from repository
   const loadCustomRules = async (context: Context): Promise<string | null> => {
     const repo = context.repo();
@@ -71,8 +92,14 @@ export const robot = (app: Probot) => {
 
   app.on(
     ['pull_request.opened', 'pull_request.synchronize'],
-    async (context) => {
+    async (context: any) => {
       const repo = context.repo();
+      
+      // Check if repository owner is authorized
+      if (!isAuthorizedOwner(repo.owner)) {
+        log.warn(`🚫 Unauthorized repository access blocked: ${repo.owner}/${repo.repo}`);
+        return;
+      }
       const chat = await loadChat(context);
 
       if (!chat) {
@@ -96,7 +123,7 @@ export const robot = (app: Probot) => {
       if (
         target_label &&
         (!pull_request.labels?.length ||
-          pull_request.labels.every((label) => label.name !== target_label))
+          pull_request.labels.every((label: any) => label.name !== target_label))
       ) {
         log.info('no target label attached');
         return 'no target label attached';
@@ -139,7 +166,7 @@ export const robot = (app: Probot) => {
       log.debug('includePatterns:', includePatterns);
 
       changedFiles = changedFiles?.filter(
-        (file) => {
+        (file: any) => {
           const url = new URL(file.contents_url)
           const pathname = decodeURIComponent(url.pathname)
           // if includePatterns is not empty, only include files that match the pattern
